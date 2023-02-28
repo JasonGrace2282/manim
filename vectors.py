@@ -35,6 +35,7 @@ class LT(LinearTransformationScene):
         jHat = Vector([0, 1])
         iCoords = iHat.coordinate_label()
         jCoords = jHat.coordinate_label()
+        transformation_matrix = ((1, 2), (2, 2))
         
         # Text
         vec = MathTex(r"\vec{v}").next_to(vector)
@@ -98,5 +99,6 @@ class LT(LinearTransformationScene):
         self.play(Write(text6), Uncreate(initial_pos))
         self.wait(2)
         self.add(NumberPlane())
-        self.apply_matrix(((1, 2), (2, 2)))
-        
+        self.moving_mobjects = []
+        self.apply_matrix(transformation_matrix)
+        self.play(ApplyMatrix(transformation_matrix, NumberPlane()))
