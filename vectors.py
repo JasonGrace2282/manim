@@ -1,4 +1,5 @@
 from manim import *
+from typing import Callable
 
 
 class LT(LinearTransformationScene):
@@ -17,9 +18,16 @@ class LT(LinearTransformationScene):
         myTemplate.add_to_preamble(r"\usepackage{amsmath}")
         
     def do(self, func, *args, **kwargs):
+        '''Performs a function and resets self.moving_mobjects to an empty list.'''
+        assert isinstance(func, Callable)
         func(*args, **kwargs)
         self.moving_mobjects = []
-        
+    
+    def BraceFromPoints(self, point_a, point_b, label, buff):
+        dummy = Line(point_a, point_b)
+        alpha = dummy.get_angle()+PI/2
+        brace = BraceLabel(dummy, label, brace_direction=[np.cos(alpha),np.sin(alpha),0], buff=buff)
+        return brace    
     
     def construct(self):
         self.packages()
@@ -27,6 +35,7 @@ class LT(LinearTransformationScene):
         # Shapes
         background = FullScreenRectangle(fill_color=BLACK, color=BLACK, fill_opacity=1)
         transformation_matrix = ((1, 2), (2, 1))
+        inverse = ((-1/3, 2/3), (2/3, -1/3))
         
         iBrace = BraceBetweenPoints([0, 0, 0], [1, 0, 0])
         jBrace = BraceBetweenPoints([0, 1, 0], [0, 0, 0])
@@ -40,18 +49,19 @@ class LT(LinearTransformationScene):
         postMatrixFilled = Matrix(transformation_matrix, include_background_rectangle=True).to_edge(DL).set_column_colors([RED, BLUE], [RED, BLUE])
         postXY = Matrix((('x'), ('y')), include_background_rectangle=True).set_column_colors([RED, BLUE], [RED, BLUE])
         xy.next_to(matrix, LEFT, buff=0.5)
-        postXY.next_to(postMatrix, LEFT)
+        postXY.next_to(postMatrix, RIGHT)
         
         vector = Vector([2, 2], color=YELLOW)
         iHat = Vector([1, 0])
         jHat = Vector([0, 1])
         iCoords = iHat.coordinate_label()
         jCoords = jHat.coordinate_label()
-        iCoordsAfter = Vector([1, 2]).coordinate_label()
-        jCoordsAfter = Vector([2, 1]).coordinate_label()
-        i, j = BraceBetweenPoints([1, 2, 0], [0, 0, 0]), BraceBetweenPoints([0, 0, 0], [2, 1, 0])
-        iTextAfter = i.get_tex(r"\hat{i}")
-        jTextAfter = j.get_tex(r"\hat{j}")
+        iAfter = Vector((1, 2))
+        jAfter = Vector([2, 1])
+        iCoordsAfter = iAfter.coordinate_label()
+        jCoordsAfter = jAfter.coordinate_label()
+        i = self.BraceFromPoints(iAfter.get_start(), iAfter.get_end(), r"\hat{i}", buff=0.1).set_color(GREEN)
+        j = self.BraceFromPoints(jAfter.get_end(), jAfter.get_start(), r"\hat{j}", buff=0.1).set_color(RED)
         
         # Text
         vec = MathTex(r"\vec{v}").next_to(vector)
@@ -72,12 +82,12 @@ class LT(LinearTransformationScene):
         text12 = self.long_text(r"Let's see what happens to a vector when we apply the transformation $\begin{bmatrix}1 & 2\\ 2 & 1\end{bmatrix}$").to_edge(UP)
         
         self.remove(self.plane)
-        self.add(background)
+        self.do(self.add, background)
         self.play(Write(intro))
         self.wait(4)
         self.play(Write(text1), Uncreate(intro))
         self.wait(4)
-        self.remove(background)
+        self.do(self.remove, background)
         self.play(Write(text2),
                   Uncreate(text1),
                   Create(vec),
@@ -92,7 +102,6 @@ class LT(LinearTransformationScene):
                 Create(jText)
                 )
         self.wait(4)
-        self.remove()
         self.play(Write(text4),
                   Uncreate(text3),
                   Uncreate(iText),
@@ -113,7 +122,7 @@ class LT(LinearTransformationScene):
         self.wait(4)
         self.play(Write(initial_pos_txt), Uncreate(text5))
         self.wait(4)
-        self.remove(matrix, jCoords, iCoords)
+        self.do(self.remove, matrix, jCoords, iCoords)
         self.play(Create(initial_matrix))
         self.wait(4)
         self.play(Write(initial_pos), Uncreate(initial_pos_txt))
@@ -139,19 +148,18 @@ class LT(LinearTransformationScene):
             Uncreate(postMatrix),
             Create(postMatrixFilled),
             Create(i),
-            Create(j),
-            Create(iTextAfter),
-            Create(jTextAfter)
+            Create(j)
         )
         self.wait(4)
         self.play(Uncreate(text8), Create(text9))
         self.wait(4)
         self.play(Uncreate(text9), Create(text10))
         self.wait(4)
-        self.add(background)
-        self.remove(postMatrix, postXY, self.plane, iCoordsAfter, jCoordsAfter, initial_matrix, xy)
+        self.do(self.add, background)
+        self.do(self.remove, postMatrix, postXY, iCoordsAfter, jCoordsAfter, initial_matrix, xy)
         self.play(Uncreate(text10), Create(text11))
-        self.do(self.apply_inverse, transformation_matrix)
+        self.do(self.remove, self.plane)
+        self.do(self.apply_matrix, inverse, run_time = 0)
         self.wait(4)
         self.play(Uncreate(text11), Create(text12))
         self.do(self.add, self.plane)
