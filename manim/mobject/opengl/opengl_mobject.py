@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import itertools as it
 import numbers
 import os
@@ -38,7 +39,6 @@ from manim.utils.iterables import (
     uniq_chain,
 )
 from manim.utils.paths import straight_path
-from manim.utils.simple_functions import get_parameters
 from manim.utils.space_ops import (
     angle_between_vectors,
     angle_of_vector,
@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     _F = TypeVar("_F", bound=Callable[..., Any])
 
 UNIFORM_DTYPE = np.float64
-
+__all__ = ["OpenGLMobject", "OpenGLGroup", "OpenGLPoint", "_AnimationBuilder"]
 
 def stash_mobject_pointers(func: _F) -> _F:
     @wraps(func)
@@ -1541,7 +1541,7 @@ class OpenGLMobject:
         index: int | None = None,
         call_updater: bool = False,
     ) -> Self:
-        if "dt" in get_parameters(update_function):
+        if "dt" in inspect.signature(update_function).parameters:
             updater_list: list[Updater] = self.time_based_updaters  # type: ignore
         else:
             updater_list: list[Updater] = self.non_time_updaters  # type: ignore

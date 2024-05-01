@@ -6,7 +6,6 @@ __all__ = [
     "binary_search",
     "choose",
     "clip",
-    "get_parameters",
     "sigmoid",
 ]
 

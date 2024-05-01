@@ -15,8 +15,16 @@ from manim.mobject.opengl.opengl_mobject import OpenGLMobject, OpenGLPoint
 from manim.renderer.shader_wrapper import ShaderWrapper
 from manim.utils.color import BLACK, color_to_rgba
 
-from ..constants import *
-from ..constants import RADIANS
+from ..constants import (
+    ORIGIN,
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
+    OUT,
+    RADIANS,
+    DEGREES
+)
 from ..utils.simple_functions import fdiv
 from ..utils.space_ops import normalize
 

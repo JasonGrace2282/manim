@@ -1,11 +1,32 @@
 from __future__ import annotations
 
+from manim.utils.parameter_parsing import flatten_iterable_parameters
+
+__all__ = ["Scene"]
+
+import copy
+import datetime
 import inspect
 import os
 import platform
 import random
 import time
 from collections import OrderedDict
+from typing import TYPE_CHECKING
+
+import types
+from queue import Queue
+
+import srt
+
+from manim.scene.section import DefaultSectionType
+
+try:
+    import dearpygui.dearpygui as dpg
+
+    dearpygui_imported = True
+except ImportError:
+    dearpygui_imported = False
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -716,14 +737,61 @@ class Scene:
 
     def play(
         self,
-        *proto_animations: Animation | _AnimationBuilder,
+        *proto_animations: Animation | Iterable[Animation] | types.GeneratorType[Animation],
         run_time: float | None = None,
         rate_func: Callable[[float], float] | None = None,
         lag_ratio: float | None = None,
-    ) -> None:
+        subcaption=None,
+        subcaption_duration=None,
+        subcaption_offset=0,
+        **kwargs,
+    ):
+        r"""Plays an animation in this scene.
+
+        Parameters
+        ----------
+
+        args
+            Animations to be played.
+        subcaption
+            The content of the external subcaption that should
+            be added during the animation.
+        subcaption_duration
+            The duration for which the specified subcaption is
+            added. If ``None`` (the default), the run time of the
+            animation is taken.
+        subcaption_offset
+            An offset (in seconds) for the start time of the
+            added subcaption.
+        kwargs
+            All other keywords are passed to the renderer.
+
+        """
         if len(proto_animations) == 0:
             logger.warning("Called Scene.play with no animations")
-            return
+
+        # This is in main, but doesn't work here yet.
+        # If we are in interactive embedded mode, make sure this is running on the main thread (required for OpenGL)
+        # if (
+        #     self.interactive_mode
+        #     and config.renderer == RendererType.OPENGL
+        #     and threading.current_thread().name != "MainThread"
+        # ):
+        #     kwargs.update(
+        #         {
+        #             "subcaption": subcaption,
+        #             "subcaption_duration": subcaption_duration,
+        #             "subcaption_offset": subcaption_offset,
+        #         }
+        #     )
+        #     self.queue.put(
+        #         (
+        #             "play",
+        #             args,
+        #             kwargs,
+        #         )
+        #     )
+        #     return
         animations = [prepare_animation(x) for x in proto_animations]
         for anim in animations:
             anim.update_rate_info(run_time, rate_func, lag_ratio)

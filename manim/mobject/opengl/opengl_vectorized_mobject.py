@@ -1044,7 +1044,7 @@ class OpenGLVMobject(OpenGLMobject):
 
         return alpha
 
-    def get_anchors_and_handles(self):
+    def get_anchors_and_handles(self) -> Iterable[np.ndarray]:
         """
         Returns anchors1, handles, anchors2,
         where (anchors1[i], handles[i], anchors2[i])
@@ -1076,12 +1076,12 @@ class OpenGLVMobject(OpenGLMobject):
         nppc = self.n_points_per_curve
         return self.points[nppc - 1 :: nppc]
 
-    def get_anchors(self) -> np.ndarray:
+    def get_anchors(self) -> Iterable[np.ndarray]:
         """Returns the anchors of the curves forming the OpenGLVMobject.
 
         Returns
         -------
-        np.ndarray
+        Iterable[np.ndarray]
             The anchors.
         """
         points = self.points
@@ -1315,14 +1315,17 @@ class OpenGLVMobject(OpenGLMobject):
         for _ in range(-diff):
             ipc[np.argmax(ipc)] -= 1
 
-        new_points = []
+        new_length = sum(x + 1 for x in ipc)
+        new_points = np.empty((new_length, nppc, 3))
+        i = 0
         for group, n_inserts in zip(bezier_groups, ipc):
             # What was once a single quadratic curve defined
             # by "group" will now be broken into n_inserts + 1
             # smaller quadratic curves
             alphas = np.linspace(0, 1, n_inserts + 2)
             for a1, a2 in zip(alphas, alphas[1:]):
-                new_points += partial_quadratic_bezier_points(group, a1, a2)
+                new_points[i] = partial_quadratic_bezier_points(group, a1, a2)
+                i = i + 1
         return np.vstack(new_points)
 
     def interpolate_color(self, mobject1, mobject2, alpha):

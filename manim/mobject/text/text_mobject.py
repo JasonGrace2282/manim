@@ -49,6 +49,8 @@ Examples
 
 from __future__ import annotations
 
+import functools
+
 __all__ = ["Text", "Paragraph", "MarkupText", "register_font"]
 
 
@@ -76,6 +78,8 @@ from manim.utils.deprecation import deprecated
 TEXT_MOB_SCALE_FACTOR = 0.05
 DEFAULT_LINE_SPACING_SCALE = 0.3
 TEXT2SVG_ADJUSTMENT_FACTOR = 4.8
+
+__all__ = ["Text", "Paragraph", "MarkupText", "register_font"]
 
 
 def remove_invisible_chars(mobject: SVGMobject) -> SVGMobject:
@@ -350,7 +354,7 @@ class Text(SVGMobject):
                )
                 text6.scale(1.3).shift(DOWN)
                 self.add(text1, text2, text3, text4, text5 , text6)
-                Group(*self.mobjects).arrange(DOWN, buff=.8).set_height(config.frame_height-LARGE_BUFF)
+                Group(*self.mobjects).arrange(DOWN, buff=.8).set(height=config.frame_height-LARGE_BUFF)
 
     .. manim:: TextMoreCustomization
             :save_last_frame:
@@ -407,6 +411,11 @@ class Text(SVGMobject):
 
     """
 
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def font_list() -> list[str]:
+        return manimpango.list_fonts()
+
     def __init__(
         self,
         text: str,
@@ -431,13 +440,25 @@ class Text(SVGMobject):
         width: float = None,
         should_center: bool = True,
         disable_ligatures: bool = False,
+        use_svg_cache: bool = False,
         **kwargs,
     ) -> None:
         self.line_spacing = line_spacing
         if font and warn_missing_font:
-            fonts_list = manimpango.list_fonts()
+            fonts_list = Text.font_list()
+            # handle special case of sans/sans-serif
+            if font.lower() == "sans-serif":
+                font = "sans"
             if font not in fonts_list:
-                logger.warning(f"Font {font} not in {fonts_list}.")
+                # check if the capitalized version is in the supported fonts
+                if font.capitalize() in fonts_list:
+                    font = font.capitalize()
+                elif font.lower() in fonts_list:
+                    font = font.lower()
+                elif font.title() in fonts_list:
+                    font = font.title()
+                else:
+                    logger.warning(f"Font {font} not in {fonts_list}.")
         self.font = font
         self._font_size = float(font_size)
         # needs to be a float or else size is inflated when font_size = 24
@@ -462,7 +483,7 @@ class Text(SVGMobject):
         t2g = kwargs.pop("text2gradient", t2g)
         t2s = kwargs.pop("text2slant", t2s)
         t2w = kwargs.pop("text2weight", t2w)
-        self.t2c = t2c
+        self.t2c = {k: ManimColor(v).to_hex() for k, v in t2c.items()}
         self.t2f = t2f
         self.t2g = t2g
         self.t2s = t2s
@@ -482,7 +503,7 @@ class Text(SVGMobject):
             self.line_spacing = self._font_size + self._font_size * self.line_spacing
 
         color: ManimColor = ManimColor(color) if color else VMobject().color
-        file_name = self._text2svg(color)
+        file_name = self._text2svg(color.to_hex())
         PangoUtils.remove_last_M(file_name)
         super().__init__(
             file_name,
@@ -491,7 +512,7 @@ class Text(SVGMobject):
             height=height,
             width=width,
             should_center=should_center,
-            use_svg_cache=False,
+            use_svg_cache=use_svg_cache,
             **kwargs,
         )
         self.text = text
@@ -742,7 +763,7 @@ class Text(SVGMobject):
         # setting_args requires values to be strings
 
         default_args = {
-            arg: getattr(self, arg) if arg != "color" else str(color) for _, arg in t2xs
+            arg: getattr(self, arg) if arg != "color" else color for _, arg in t2xs
         }
 
         settings = self._get_settings_from_t2xs(t2xs, default_args)
@@ -1132,6 +1153,11 @@ class MarkupText(SVGMobject):
 
     """
 
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def font_list() -> list[str]:
+        return manimpango.list_fonts()
+
     def __init__(
         self,
         text: str,
@@ -1156,9 +1182,20 @@ class MarkupText(SVGMobject):
         self.text = text
         self.line_spacing = line_spacing
         if font and warn_missing_font:
-            fonts_list = manimpango.list_fonts()
+            fonts_list = Text.font_list()
+            # handle special case of sans/sans-serif
+            if font.lower() == "sans-serif":
+                font = "sans"
             if font not in fonts_list:
-                logger.warning(f"Font {font} not in {fonts_list}.")
+                # check if the capitalized version is in the supported fonts
+                if font.capitalize() in fonts_list:
+                    font = font.capitalize()
+                elif font.lower() in fonts_list:
+                    font = font.lower()
+                elif font.title() in fonts_list:
+                    font = font.title()
+                else:
+                    logger.warning(f"Font {font} not in {fonts_list}.")
         self.font = font
         self._font_size = float(font_size)
         self.slant = slant
@@ -1306,7 +1343,7 @@ class MarkupText(SVGMobject):
         else:
             self.scale(font_val / self.font_size)
 
-    def _text2hash(self, color: ManimColor):
+    def _text2hash(self, color: ParsableManimColor):
         """Generates ``sha256`` hash for file name."""
         settings = (
             "MARKUPPANGO"
@@ -1323,8 +1360,9 @@ class MarkupText(SVGMobject):
         hasher.update(id_str.encode())
         return hasher.hexdigest()[:16]
 
-    def _text2svg(self, color: ManimColor):
+    def _text2svg(self, color: ParsableManimColor | None):
         """Convert the text to SVG using Pango."""
+        color = ManimColor(color)
         size = self._font_size
         line_spacing = self.line_spacing
         size /= TEXT2SVG_ADJUSTMENT_FACTOR

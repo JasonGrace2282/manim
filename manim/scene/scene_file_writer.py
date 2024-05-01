@@ -110,49 +110,53 @@ class SceneFileWriter:
             name += f"_{eaan}"
         return name
 
-    def get_resolution_directory(self) -> str:
-        pixel_height = self.scene.camera.pixel_height
-        fps = self.scene.camera.fps
-        return f"{pixel_height}p{fps}"
+    def finish_last_section(self) -> None:
+        """Delete current section if it is empty."""
+        if len(self.sections) and self.sections[-1].is_empty():
+            self.sections.pop()
 
-    # Directory getters
-    def get_image_file_path(self) -> str:
-        return self.image_file_path
+    def next_section(self, name: str, type: str, skip_animations: bool) -> None:
+        """Create segmentation cut here."""
+        self.finish_last_section()
 
-    def get_next_partial_movie_path(self) -> str:
-        result = Path(self.partial_movie_directory) / "{:05}{}".format(
-            self.scene.num_plays,
-            self.movie_file_extension,
+        # images don't support sections
+        section_video: str | None = None
+        # don't save when None
+        if (
+            not config.dry_run
+            and write_to_movie()
+            and config.save_sections
+            and not skip_animations
+        ):
+            # relative to index file
+            section_video = f"{self.output_name}_{len(self.sections):04}_{name}{config.movie_file_extension}"
+
+        self.sections.append(
+            Section(
+                type,
+                section_video,
+                name,
+                skip_animations,
+            ),
         )
-        return result
 
-    def get_movie_file_path(self) -> str:
-        return self.movie_file_path
+    def add_partial_movie_file(self, hash_animation: str):
+        """Adds a new partial movie file path to `scene.partial_movie_files` and current section from a hash.
+        This method will compute the path from the hash. In addition to that it adds the new animation to the current section.
 
-    def get_saved_mobject_directory(self) -> str:
-        return guarantee_existence(self.saved_mobject_directory)
+        Parameters
+        ----------
+        hash_animation
+            Hash of the animation.
+        """
+        if not hasattr(self, "partial_movie_directory") or not write_to_movie():
+            return
 
-    def get_saved_mobject_path(self, mobject: Mobject) -> str | None:
-        directory = self.get_saved_mobject_directory()
-        files = os.listdir(directory)
-        default_name = str(mobject) + "_0.mob"
-        index = 0
-        while default_name in files:
-            default_name = default_name.replace(str(index), str(index + 1))
-            index += 1
-        if platform.system() == "Darwin":
-            cmds = [
-                "osascript",
-                "-e",
-                f"""
-                set chosenfile to (choose file name default name "{default_name}" default location "{directory}")
-                POSIX path of chosenfile
-                """,
-            ]
-            process = sp.Popen(cmds, stdout=sp.PIPE)
-            file_path = process.stdout.read().decode("utf-8").split("\n")[0]
-            if not file_path:
-                return
+        # None has to be added to partial_movie_files to keep the right index with scene.num_plays.
+        # i.e if an animation is skipped, scene.num_plays is still incremented and we add an element to partial_movie_file be even with num_plays.
+        if hash_animation is None:
+            self.partial_movie_files.append(None)
+            self.sections[-1].partial_movie_files.append(None)
         else:
             user_name = input(f"Enter mobject file name (default is {default_name}): ")
             file_path = Path(directory) / (user_name or default_name)
@@ -490,40 +494,15 @@ class SceneFileWriter:
             {"par_dir": self.partial_movie_directory},
         )
 
-    def open_file(self) -> None:
-        if self.quiet:
-            curr_stdout = sys.stdout
-            sys.stdout = open(os.devnull, "w")
+    def write_subcaption_file(self):
+        """Writes the subcaption file."""
+        if config.output_file is None:
+            return
+        subcaption_file = Path(config.output_file).with_suffix(".srt")
+        subcaption_file.write_text(srt.compose(self.subcaptions), encoding="utf-8")
+        logger.info(f"Subcaption file has been written as {subcaption_file}")
 
-        current_os = platform.system()
-        file_paths = []
-
-        if self.save_last_frame:
-            file_paths.append(self.get_image_file_path())
-        if self.write_to_movie:
-            file_paths.append(self.get_movie_file_path())
-
-        for file_path in file_paths:
-            if current_os == "Windows":
-                os.startfile(file_path)
-            else:
-                commands = []
-                if current_os == "Linux":
-                    commands.append("xdg-open")
-                elif current_os.startswith("CYGWIN"):
-                    commands.append("cygstart")
-                else:  # Assume macOS
-                    commands.append("open")
-
-                if self.show_file_location_upon_completion:
-                    commands.append("-R")
-
-                commands.append(file_path)
-
-                FNULL = open(os.devnull, "w")
-                sp.call(commands, stdout=FNULL, stderr=sp.STDOUT)
-                FNULL.close()
-
-        if self.quiet:
-            sys.stdout.close()
-            sys.stdout = curr_stdout
+    def print_file_ready_message(self, file_path):
+        """Prints the "File Ready" message to STDOUT."""
+        config["output_file"] = file_path
+        logger.info("\nFile ready at %(file_path)s\n", {"file_path": f"'{file_path}'"})
