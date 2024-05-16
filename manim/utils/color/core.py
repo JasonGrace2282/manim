@@ -48,6 +48,7 @@ from manim.typing import (
     RGBA_Tuple_Int,
 )
 
+from .validation import InternalValueValidator
 from ...utils.space_ops import normalize
 
 # import manim._config as _config
@@ -105,6 +106,7 @@ class ManimColor:
         The opacity of the color. By default, colors are
         fully opaque (value 1.0).
     """
+    _internal_value = InternalValueValidator()
 
     def __init__(
         self,
@@ -169,37 +171,6 @@ class ManimColor:
                 "list[int, int, int, int], list[float, float, float], "
                 f"list[float, float, float, float], not {type(value)}"
             )
-
-    @property
-    def _internal_value(self) -> ManimColorInternal:
-        """Returns the internal value of the current Manim color [r,g,b,a] float array
-
-        Returns
-        -------
-        ManimColorInternal
-            internal color representation
-        """
-        return self.__value
-
-    @_internal_value.setter
-    def _internal_value(self, value: ManimColorInternal) -> None:
-        """Overwrites the internal color value of the ManimColor object
-
-        Parameters
-        ----------
-        value : ManimColorInternal
-            The value which will overwrite the current color
-
-        Raises
-        ------
-        TypeError
-            Raises a TypeError if an invalid array is passed
-        """
-        if not isinstance(value, np.ndarray):
-            raise TypeError("value must be a numpy array")
-        if value.shape[0] != 4:
-            raise TypeError("Array must have 4 values exactly")
-        self.__value: ManimColorInternal = value
 
     @staticmethod
     def _internal_from_integer(value: int, alpha: float) -> ManimColorInternal:
