@@ -495,7 +495,7 @@ Please refer to the documentation of the function you are using for
 further type information.
 """
 
-BezierPoints: TypeAlias = Point3D_Array
+BezierPoints: TypeAlias = InternalPoint3D_Array
 r"""``shape: (PPC, 3)``
 
 A `Point3D_Array` of :math:`\text{PPC}` control points
